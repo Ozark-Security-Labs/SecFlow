@@ -1,0 +1,41 @@
+name: default-audit
+version: 1
+initial: initialize
+states:
+  - id: initialize
+    description: Prepare a local SecFlow audit run.
+    actions:
+      - type: profile
+    transitions:
+      - on: success
+        target: business-workflows
+  - id: business-workflows
+    description: Extract business workflows, actors, assets, state transitions, and invariants.
+    actions:
+      - type: extract-business-workflows
+        promptId: workflow-extraction
+    transitions:
+      - on: success
+        target: deterministic-tools
+  - id: deterministic-tools
+    description: Run registered deterministic security tools.
+    actions:
+      - type: run-tools
+    transitions:
+      - on: success
+        target: llm-review
+  - id: llm-review
+    description: Synthesize scanner findings and business logic hypotheses through the configured runtime.
+    actions:
+      - type: llm
+        promptId: report-synthesis
+    transitions:
+      - on: success
+        target: reports
+      - on: skipped
+        target: reports
+  - id: reports
+    description: Write Markdown, JSON, and SARIF artifacts.
+    actions:
+      - type: write-reports
+    transitions: []

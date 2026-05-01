@@ -1,0 +1,24 @@
+# Default ownership for the SecFlow repository.
+* @bjcorder
+
+# Application source and tests.
+/src/ @bjcorder
+/tests/ @bjcorder
+
+# Security prompts, playbooks, and policy-like configuration.
+/prompts/ @bjcorder
+/playbooks/ @bjcorder
+/.secflow/ @bjcorder
+
+# Provider and local agent runtime adapters.
+/src/llm/ @bjcorder
+/src/tools/ @bjcorder
+
+# Documentation and project metadata.
+/README.md @bjcorder
+/LICENSE @bjcorder
+/package.json @bjcorder
+/tsconfig.json @bjcorder
+
+# GitHub ownership and automation metadata.
+/.github/ @bjcorder
