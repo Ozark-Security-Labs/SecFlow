@@ -6,14 +6,21 @@ import {commandExists, commandVersion} from '../util/process.js';
 
 export const builtInToolAdapters = [semgrepAdapter, trivyAdapter, joernAdapter];
 
-export async function runConfiguredTools(targetPath: string, runDir: string, config: SecFlowConfig): Promise<ToolRunResult[]> {
+export async function runConfiguredTools(
+  targetPath: string,
+  runDir: string,
+  config: SecFlowConfig,
+  onToolComplete?: (result: ToolRunResult) => void
+): Promise<ToolRunResult[]> {
   const results: ToolRunResult[] = [];
   for (const adapter of builtInToolAdapters) {
     const toolConfig = config.tools[adapter.name];
     if (!toolConfig) {
       continue;
     }
-    results.push(await adapter.run(targetPath, runDir, toolConfig));
+    const result = await adapter.run(targetPath, runDir, toolConfig);
+    results.push(result);
+    onToolComplete?.(result);
   }
   return results;
 }

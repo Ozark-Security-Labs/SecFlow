@@ -21,10 +21,17 @@ It profiles application repositories, runs registered deterministic security too
 npm install
 npm run build
 npm run dev -- init
+npm run dev
 npm run dev -- audit .
 ```
 
 By default, LLM runtimes are disabled and scanner tools are detected from your local `PATH`. Enable runtimes in `.secflow/config.yaml` and pass `--approve-context` when you want a curated, redacted context package sent to a configured provider or local agent CLI.
+
+Running `npm run dev` launches the interactive TUI audit wizard. It walks through target selection, preflight checks, live audit progress, optional LLM context approval, and results/report review.
+
+## WSL Terminal Note
+
+When running the TUI in WSL through Windows Terminal, there is a known unresolved issue where terminal input mode can remain in an odd state after exit. SecFlow attempts to reset the known modes on shutdown, but this does not fully resolve the issue in all WSL setups. If arrow keys start printing raw sequences or input behaves strangely, open a new terminal tab.
 
 ## Commands
 

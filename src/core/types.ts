@@ -160,3 +160,64 @@ export interface AuditRun {
   reportPath: string;
   sarifPath: string;
 }
+
+export type AuditStep =
+  | 'initialize'
+  | 'profile'
+  | 'business-workflows'
+  | 'tools'
+  | 'context-preview'
+  | 'llm'
+  | 'reports'
+  | 'complete'
+  | 'error';
+
+export interface ContextPreview {
+  runtime: string;
+  promptId: string;
+  sizeBytes: number;
+  maxBytes: number;
+  requireApproval: boolean;
+  redactionPatternCount: number;
+  contextPath: string;
+}
+
+export type AuditEvent =
+  | {
+      type: 'step:start' | 'step:complete';
+      step: AuditStep;
+      message: string;
+      timestamp: string;
+      data?: Record<string, unknown>;
+    }
+  | {
+      type: 'tool:complete';
+      step: 'tools';
+      timestamp: string;
+      result: ToolRunResult;
+    }
+  | {
+      type: 'context:preview';
+      step: 'context-preview';
+      timestamp: string;
+      preview: ContextPreview;
+    }
+  | {
+      type: 'llm:skipped';
+      step: 'llm';
+      timestamp: string;
+      reason: string;
+    }
+  | {
+      type: 'run:complete';
+      step: 'complete';
+      timestamp: string;
+      run: AuditRun;
+    }
+  | {
+      type: 'error';
+      step: 'error';
+      timestamp: string;
+      message: string;
+      error?: unknown;
+    };
