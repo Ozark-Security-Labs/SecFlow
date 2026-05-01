@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import React from 'react';
 import {Command} from 'commander';
-import {render} from 'ink';
 import {auditCommand} from './cli/audit.js';
 import {doctorCommand} from './cli/doctor.js';
 import {initProject} from './cli/init.js';
 import {modelsCommand} from './cli/models.js';
 import {validatePlaybookCommand} from './cli/playbooks.js';
-import {App} from './tui/App.js';
+import {renderFullscreenTui} from './tui/render.js';
 
 const program = new Command();
 
@@ -15,8 +14,8 @@ program
   .name('secflow')
   .description('LLM harness for application security engineers and application defenders')
   .version('0.1.0')
-  .action(() => {
-    render(<App cwd={process.cwd()} />);
+  .action(async () => {
+    await renderFullscreenTui(process.cwd());
   });
 
 program

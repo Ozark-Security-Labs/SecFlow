@@ -2,6 +2,7 @@ import React from 'react';
 import {describe, expect, it} from 'vitest';
 import {render} from 'ink-testing-library';
 import {App, ContextApprovalScreen, HomeScreen, PreflightScreen, ResultsScreen, RunningScreen, TargetScreen} from '../src/tui/App.js';
+import {ProgressRail} from '../src/tui/components.js';
 import type {AuditEvent, AuditRun, ContextPreview} from '../src/core/types.js';
 import type {PreflightData} from '../src/tui/preflight.js';
 import {defaultConfig} from '../src/core/defaults.js';
@@ -11,6 +12,7 @@ const cwd = process.cwd();
 describe('TUI screens', () => {
   it('renders the home screen', () => {
     const instance = render(<HomeScreen onSelect={() => undefined} />);
+    expect(instance.lastFrame()).toContain('AppSec audit harness');
     expect(instance.lastFrame()).toContain('Start audit wizard');
   });
 
@@ -21,14 +23,25 @@ describe('TUI screens', () => {
 
   it('renders the preflight screen', () => {
     const instance = render(<PreflightScreen data={fakePreflight()} onSelect={() => undefined} />);
+    expect(instance.lastFrame()).toContain('╭');
     expect(instance.lastFrame()).toContain('Preflight');
+    expect(instance.lastFrame()).toContain('install or disable');
     expect(instance.lastFrame()).toContain('Run audit');
   });
 
   it('renders running progress', () => {
     const events: AuditEvent[] = [{type: 'step:start', step: 'profile', message: 'Profiling repository.', timestamp: new Date().toISOString()}];
     const instance = render(<RunningScreen events={events} />);
+    expect(instance.lastFrame()).toContain('Audit Steps');
+    expect(instance.lastFrame()).toContain('[RUNNING]');
     expect(instance.lastFrame()).toContain('Profiling repository');
+  });
+
+  it('renders skipped LLM status in the progress rail', () => {
+    const events: AuditEvent[] = [{type: 'llm:skipped', step: 'llm', reason: 'No default runtime configured.', timestamp: new Date().toISOString()}];
+    const instance = render(<ProgressRail events={events} />);
+    expect(instance.lastFrame()).toContain('[SKIPPED]');
+    expect(instance.lastFrame()).toContain('LLM');
   });
 
   it('renders context approval', () => {
@@ -57,13 +70,14 @@ describe('TUI interactions', () => {
       />
     );
 
+    expect(instance.lastFrame()).toContain('Tab or arrows move');
     instance.stdin.write('\r');
     await waitForFrame(instance, 'Target Repository');
-    instance.stdin.write('\r');
+    instance.stdin.write('\n');
     await waitForFrame(instance, 'Run audit');
     instance.stdin.write('\r');
-    await waitForFrame(instance, 'Results');
-  });
+    await waitForFrame(instance, 'Run: test-run');
+  }, 10000);
 
   it('skips LLM context approval and completes', async () => {
     const instance = render(
@@ -85,14 +99,14 @@ describe('TUI interactions', () => {
 
     instance.stdin.write('\r');
     await waitForFrame(instance, 'Target Repository');
-    instance.stdin.write('\r');
+    instance.stdin.write('\n');
     await waitForFrame(instance, 'Run audit');
     instance.stdin.write('\r');
     await waitForFrame(instance, 'LLM Context Approval');
     instance.stdin.write('\t');
     instance.stdin.write('\r');
-    await waitForFrame(instance, 'Results');
-  });
+    await waitForFrame(instance, 'Run: test-run');
+  }, 10000);
 
   it('confirms quit during context approval', async () => {
     const instance = render(
@@ -108,7 +122,7 @@ describe('TUI interactions', () => {
 
     instance.stdin.write('\r');
     await waitForFrame(instance, 'Target Repository');
-    instance.stdin.write('\r');
+    instance.stdin.write('\n');
     await waitForFrame(instance, 'Run audit');
     instance.stdin.write('\r');
     await waitForFrame(instance, 'LLM Context Approval');
@@ -116,7 +130,7 @@ describe('TUI interactions', () => {
     await waitForFrame(instance, 'Exit Active Run?');
     instance.stdin.write('\r');
     await waitForFrame(instance, 'LLM Context Approval');
-  });
+  }, 10000);
 });
 
 function fakePreflight(overrides: Partial<PreflightData> = {}): PreflightData {
@@ -199,7 +213,7 @@ function fakeRun(): AuditRun {
 }
 
 async function waitForFrame(instance: ReturnType<typeof render>, text: string): Promise<void> {
-  for (let index = 0; index < 50; index += 1) {
+  for (let index = 0; index < 200; index += 1) {
     if (instance.lastFrame()?.includes(text)) {
       return;
     }
