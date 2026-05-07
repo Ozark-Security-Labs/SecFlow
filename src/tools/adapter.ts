@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import path from 'node:path';
 import type {NormalizedFinding, ToolConfig, ToolRunResult} from '../core/types.js';
 import {commandExists, runProcess} from '../util/process.js';

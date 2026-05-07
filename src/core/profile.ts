@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {readdir, readFile, stat} from 'node:fs/promises';
 import path from 'node:path';
 import type {RepoProfile} from './types.js';

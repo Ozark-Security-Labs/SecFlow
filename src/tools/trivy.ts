@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {NormalizedFinding} from '../core/types.js';
 import type {ToolAdapter} from './adapter.js';
 import {runToolCommand} from './adapter.js';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {SecFlowConfig, ToolRunResult} from '../core/types.js';
 import {joernAdapter} from './joern.js';
 import {semgrepAdapter} from './semgrep.js';

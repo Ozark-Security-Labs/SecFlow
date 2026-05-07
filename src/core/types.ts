@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export type Severity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 
 export type FindingSource = 'semgrep' | 'trivy' | 'joern' | 'business-logic' | 'llm';

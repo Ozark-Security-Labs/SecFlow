@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import path from 'node:path';
 import type {AuditEvent, AuditRun, AuditStep, ContextPreview, LlmResponse, LlmTask, NormalizedFinding, SecFlowConfig} from './types.js';
 import {extractBusinessWorkflowModel} from './business.js';

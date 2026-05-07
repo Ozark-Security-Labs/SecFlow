@@ -47,3 +47,13 @@ secflow models list
 ## Security Posture
 
 SecFlow detects but does not install Semgrep, Trivy, Joern, Codex CLI, or Claude Code CLI. Tool execution is limited to registered adapters with explicit commands, timeouts, output caps, and run logs. Patch output is generated as reviewable artifacts only; V1 does not directly edit audited source repositories.
+
+## Contributing
+
+Contributions to SecFlow are welcome. By contributing, you agree that your contribution is submitted under the SecFlow Contributor License Agreement in [CLA.md](CLA.md).
+
+## License
+
+SecFlow is licensed under the GNU Affero General Public License version 3 only (`AGPL-3.0-only`). See [LICENSE](LICENSE) for the full license text.
+
+If you modify SecFlow and make it available for remote network interaction, the AGPL requires you to offer corresponding source to those users.

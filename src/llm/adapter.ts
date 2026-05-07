@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {LlmResponse, LlmTask, ModelProfile, ProviderConfig} from '../core/types.js';
 
 export interface RuntimeInvocation {

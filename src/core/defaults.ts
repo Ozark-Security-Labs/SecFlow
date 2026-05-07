@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {SecFlowConfig} from './types.js';
 
 export const requiredPromptIds = [

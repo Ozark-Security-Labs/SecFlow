@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {describe, expect, it} from 'vitest';
 import type {RuntimeInvocation} from '../src/llm/adapter.js';
 import {buildClaudeCodeArgs} from '../src/llm/adapters/claudeCodeCli.js';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import React, {useRef, useState} from 'react';
 import path from 'node:path';
 import {Box, Text, useApp, useInput} from 'ink';

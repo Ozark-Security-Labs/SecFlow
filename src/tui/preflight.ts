@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import path from 'node:path';
 import type {SecFlowConfig} from '../core/types.js';
 import {loadConfig} from '../core/config.js';
