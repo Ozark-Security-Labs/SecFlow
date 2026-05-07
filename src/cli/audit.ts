@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {runAudit} from '../core/auditEngine.js';
 import {loadConfig} from '../core/config.js';
 

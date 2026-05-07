@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {LlmResponse, LlmTask, SecFlowConfig} from '../core/types.js';
 import {anthropicAdapter} from './adapters/anthropic.js';
 import {claudeCodeCliAdapter} from './adapters/claudeCodeCli.js';

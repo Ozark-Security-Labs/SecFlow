@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {BusinessRisk, BusinessWorkflowModel, RepoProfile, Severity} from './types.js';
 import {readSmallTextFile} from './profile.js';
 

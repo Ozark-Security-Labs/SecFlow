@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {access, mkdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import YAML from 'yaml';

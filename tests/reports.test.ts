@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {describe, expect, it} from 'vitest';
 import {renderSarif} from '../src/core/reports.js';
 import type {NormalizedFinding} from '../src/core/types.js';

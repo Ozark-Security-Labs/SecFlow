@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {BusinessWorkflowModel, NormalizedFinding, ToolRunResult} from './types.js';
 
 export function findingsFromBusinessModel(model: BusinessWorkflowModel): NormalizedFinding[] {

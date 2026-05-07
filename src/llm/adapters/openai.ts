@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {LlmResponse} from '../../core/types.js';
 import {serializeTaskForPrompt, type LlmRuntimeAdapter, type RuntimeInvocation} from '../adapter.js';
 

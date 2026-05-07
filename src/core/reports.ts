@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type {AuditRun, BusinessWorkflowModel, NormalizedFinding, RepoProfile, ToolRunResult} from './types.js';
 
 export function renderMarkdownReport(run: Omit<AuditRun, 'reportPath' | 'sarifPath'>): string {

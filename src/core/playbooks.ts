@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {readFile} from 'node:fs/promises';
 import YAML from 'yaml';
 import {z} from 'zod';

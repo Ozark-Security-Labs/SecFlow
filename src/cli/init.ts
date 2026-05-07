@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import path from 'node:path';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {writeDefaultConfig} from '../core/config.js';
