@@ -10,7 +10,10 @@ export function findingsFromBusinessModel(model: BusinessWorkflowModel): Normali
     confidence: risk.confidence,
     description: risk.hypothesis,
     evidence: risk.evidence,
-    recommendation: risk.validationSteps.join(' '),
+    assumptions: risk.assumptions ?? ['Business workflow extraction needs owner validation.'],
+    exploitPath: risk.exploitPath ?? `Exercise the ${risk.workflow} workflow with a role, tenant, or approval boundary mismatch.`,
+    validationSteps: risk.validationSteps,
+    recommendation: risk.recommendation ?? risk.validationSteps.join(' '),
     metadata: {
       workflow: risk.workflow,
       validationSteps: risk.validationSteps

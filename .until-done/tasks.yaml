@@ -1,0 +1,202 @@
+generated: "2026-05-14T00:00:00.000Z"
+goal: "Rewrite SecFlow as a demo-ready local-first Ink TUI audit cockpit."
+currentTaskId: null
+allowedStatuses:
+  - pending
+  - in_progress
+  - blocked
+  - review
+  - complete
+stopConditions:
+  - required user approval
+  - destructive or shared external action
+  - unavailable credentials or tools that cannot be mocked
+  - ambiguous product decision outside the MVP plan
+  - repeated verification failure after diagnosis and targeted fixes
+finalGate:
+  status: complete
+  verify_commands:
+    - npm run build
+    - npm test
+    - npm test -- --run tests/e2e.test.ts
+phaseSummaries:
+  - phase: foundation
+    status: complete
+    summary: "Ledger, domain schemas, and durable case store are implemented and tested."
+  - phase: workflow
+    status: complete
+    summary: "Approval-aware workflow lifecycle and case-backed audit execution are implemented and tested."
+  - phase: integrations
+    status: complete
+    summary: "Scanner and LLM adapter contracts are covered by mocked and malformed-output tests."
+  - phase: tui
+    status: complete
+    summary: "Cockpit summaries now expose repo map, workflows, findings, remediation drafts, and report artifacts."
+  - phase: reports
+    status: complete
+    summary: "Markdown, JSON, SARIF, and patch draft artifacts are generated from normalized case state."
+  - phase: acceptance
+    status: complete
+    summary: "Build, full tests, and e2e audit scenarios pass."
+tasks:
+  - id: F-001
+    title: "Canonical MVP ledger and execution loop"
+    phase: foundation
+    status: complete
+    dependencies: []
+    owner: core agent
+    files_allowed:
+      - .until-done/tasks.yaml
+      - README.md
+    acceptance:
+      - "Ledger contains only MVP scope."
+      - "Previous out-of-scope publishing and index work is absent."
+      - "Every task has required fields and narrow verify commands."
+    verify_commands:
+      - npm test -- --run tests/ledger.test.ts
+    blockers: []
+    notes:
+      - "Completed; no parent task remains in_progress."
+  - id: F-002
+    title: "Domain schemas and durable case store"
+    phase: foundation
+    status: complete
+    dependencies:
+      - F-001
+    owner: core agent
+    files_allowed:
+      - src/core/types.ts
+      - src/core/schemas.ts
+      - src/core/caseStore.ts
+      - src/util/files.ts
+      - tests/caseStore.test.ts
+      - tests/config.test.ts
+    acceptance:
+      - "Domain-first Zod schemas cover cases, workflow steps, evidence, findings, approvals, artifacts, and remediation drafts."
+      - "Case store can create, load, save, append events, and write artifacts under .secflow/cases/<caseId>."
+      - "Case files remain canonical state in case.json."
+    verify_commands:
+      - npm test -- --run tests/caseStore.test.ts
+    blockers: []
+    notes:
+      - "Verified with npm test -- --run tests/caseStore.test.ts."
+  - id: W-001
+    title: "Approval-aware typed workflow runner"
+    phase: workflow
+    status: complete
+    dependencies:
+      - F-002
+    owner: core agent
+    files_allowed:
+      - src/core/workflow.ts
+      - src/core/auditEngine.ts
+      - src/core/types.ts
+      - tests/workflow.test.ts
+      - tests/auditEngine.test.ts
+    acceptance:
+      - "Runner supports pending, running, waiting-for-approval, skipped, complete, and failed step states."
+      - "MVP steps cover repo profile, repo map, workflow extraction, tools, finding normalization, LLM synthesis, remediation drafting, and report export."
+      - "LLM, local agent CLI context handoff, and patch drafting require explicit approval."
+    verify_commands:
+      - npm test -- --run tests/workflow.test.ts tests/auditEngine.test.ts
+    blockers: []
+    notes:
+      - "Verified with npm test -- --run tests/workflow.test.ts tests/auditEngine.test.ts."
+  - id: I-001
+    title: "Scanner and LLM adapter contracts"
+    phase: integrations
+    status: complete
+    dependencies:
+      - W-001
+    owner: integration agent
+    files_allowed:
+      - src/tools/adapter.ts
+      - src/tools/semgrep.ts
+      - src/tools/trivy.ts
+      - src/tools/joern.ts
+      - src/tools/registry.ts
+      - src/llm/adapter.ts
+      - src/llm/runtimeRegistry.ts
+      - src/llm/adapters/openai.ts
+      - src/llm/adapters/codexCli.ts
+      - src/llm/adapters/claudeCodeCli.ts
+      - tests/tools.test.ts
+      - tests/cliAdapters.test.ts
+      - tests/providers.test.ts
+    acceptance:
+      - "Semgrep, Trivy, and Joern preserve capped raw stdout/stderr and report missing tools as skipped states."
+      - "Malformed scanner output yields no findings without crashing."
+      - "OpenAI API, Codex CLI, and Claude Code CLI remain behind one task interface."
+    verify_commands:
+      - npm test -- --run tests/tools.test.ts tests/cliAdapters.test.ts tests/providers.test.ts
+    blockers: []
+    notes:
+      - "Verified with npm test -- --run tests/tools.test.ts tests/cliAdapters.test.ts tests/providers.test.ts."
+  - id: T-001
+    title: "Ink cockpit views from case state"
+    phase: tui
+    status: complete
+    dependencies:
+      - W-001
+    owner: tui agent
+    files_allowed:
+      - src/tui/App.tsx
+      - src/tui/components.tsx
+      - src/tui/preflight.ts
+      - src/tui/theme.ts
+      - tests/tui.test.tsx
+    acceptance:
+      - "TUI has setup/preflight, run progress, repo map, workflows, findings, approval, remediation drafts, and reports views."
+      - "Run state is rendered from workflow/case events."
+      - "Navigation tests cover core views."
+    verify_commands:
+      - npm test -- --run tests/tui.test.tsx
+    blockers: []
+    notes:
+      - "Verified with npm test -- --run tests/tui.test.tsx."
+  - id: R-001
+    title: "Reports, SARIF, JSON, and patch draft artifacts"
+    phase: reports
+    status: complete
+    dependencies:
+      - W-001
+    owner: reporting agent
+    files_allowed:
+      - src/core/reports.ts
+      - src/core/auditEngine.ts
+      - src/core/types.ts
+      - tests/reports.test.ts
+    acceptance:
+      - "Markdown, JSON, SARIF, and patch-draft artifacts are generated from case state."
+      - "Scanner-backed findings are separated from business logic hypotheses."
+      - "Findings include evidence, assumptions, confidence, exploit path, validation steps, and remediation guidance."
+    verify_commands:
+      - npm test -- --run tests/reports.test.ts
+    blockers: []
+    notes:
+      - "Verified with npm test -- --run tests/reports.test.ts."
+  - id: A-001
+    title: "MVP acceptance scenarios"
+    phase: acceptance
+    status: complete
+    dependencies:
+      - I-001
+      - T-001
+      - R-001
+    owner: core agent
+    files_allowed:
+      - tests/e2e.test.ts
+      - tests/auditEngine.test.ts
+      - tests/tui.test.tsx
+      - .until-done/tasks.yaml
+    acceptance:
+      - "E2E tests cover local audit, missing scanners, mocked scanner output, denied LLM approval, approved mocked LLM, remediation draft approval, and report export."
+      - "npm run build passes."
+      - "npm test passes."
+    verify_commands:
+      - npm run build
+      - npm test
+      - npm test -- --run tests/e2e.test.ts
+    blockers: []
+    notes:
+      - "Verified with npm run build, npm test, and npm test -- --run tests/e2e.test.ts."

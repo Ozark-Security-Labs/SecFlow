@@ -2,24 +2,28 @@
 import path from 'node:path';
 import type {LlmResponse} from '../../core/types.js';
 import {writeText} from '../../util/files.js';
-import {runProcess} from '../../util/process.js';
+import {runProcess, runProcessStreaming} from '../../util/process.js';
 import type {LlmRuntimeAdapter, RuntimeInvocation} from '../adapter.js';
 import {parseMaybeJson, serializeTaskForPrompt} from '../adapter.js';
 
 export const claudeCodeCliAdapter: LlmRuntimeAdapter = {
   kind: 'claude-code-cli',
-  async invoke(invocation) {
+  async invoke(invocation, events) {
     const promptPath = path.join(invocation.task.targetPath, '.secflow', 'tmp', `${invocation.task.id}.system.md`);
     await writeText(promptPath, invocation.task.systemPrompt);
     const prompt = serializeTaskForPrompt(invocation.task);
     const args = buildClaudeCodeArgs(invocation, promptPath, prompt);
-    const result = await runProcess({
+    const options = {
       command: invocation.provider.command ?? 'claude',
       args,
       cwd: invocation.task.targetPath,
       timeoutMs: 300000,
       outputLimitBytes: 5_000_000
-    });
+    };
+    events?.onEvent({type: 'status', message: `Running ${options.command} in print mode.`});
+    const result = events
+      ? await runProcessStreaming(options, (event) => events.onEvent({type: event.stream, message: event.line}))
+      : await runProcess(options);
     const structured = parseMaybeJson(result.stdout);
     return {
       runtime: invocation.providerName,

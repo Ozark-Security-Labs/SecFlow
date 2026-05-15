@@ -63,7 +63,7 @@ export async function runToolCommand(
     await writeText(rawJsonPath, result.stdout);
   }
 
-  const findings = result.exitCode === 0 || result.stdout ? parseFindings(result.stdout) : [];
+  const findings = result.exitCode === 0 || result.stdout ? parseToolFindings(result.stdout, parseFindings) : [];
   return {
     tool,
     command: result.commandLine,
@@ -82,4 +82,12 @@ export async function runToolCommand(
 function looksLikeJson(value: string): boolean {
   const trimmed = value.trim();
   return trimmed.startsWith('{') || trimmed.startsWith('[');
+}
+
+function parseToolFindings(stdout: string, parseFindings: (stdout: string) => NormalizedFinding[]): NormalizedFinding[] {
+  try {
+    return parseFindings(stdout);
+  } catch {
+    return [];
+  }
 }

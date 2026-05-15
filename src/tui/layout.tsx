@@ -48,8 +48,12 @@ export function fitText(value: string, maxLength: number): string {
   return `${value.slice(0, head)}...${value.slice(-tail)}`;
 }
 
-export function valueWidth(columns: number, labelLength = 0): number {
-  return Math.max(18, columns - labelLength - 4);
+export function sectionContentWidth(columns: number, framed: boolean): number {
+  return Math.max(18, columns - (framed ? 6 : 1));
+}
+
+export function valueWidth(columns: number, labelLength = 0, framed = false): number {
+  return Math.max(12, sectionContentWidth(columns, framed) - labelLength - 2);
 }
 
 function readSize(stdout: NodeJS.WriteStream): {columns: number; rows: number} {
@@ -64,7 +68,7 @@ function readSize(stdout: NodeJS.WriteStream): {columns: number; rows: number} {
 function decorateSize(size: {columns: number; rows: number}): TerminalSize {
   return {
     ...size,
-    compact: size.rows < 22,
+    compact: size.rows < 30 || size.columns < 88,
     spacious: size.rows >= 28 && size.columns >= 92,
     narrow: size.columns < 92
   };

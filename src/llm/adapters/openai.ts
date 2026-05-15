@@ -4,12 +4,13 @@ import {serializeTaskForPrompt, type LlmRuntimeAdapter, type RuntimeInvocation} 
 
 export const openAiAdapter: LlmRuntimeAdapter = {
   kind: 'openai',
-  async invoke(invocation) {
+  async invoke(invocation, events) {
     const apiKey = process.env[invocation.provider.apiKeyEnv ?? 'OPENAI_API_KEY'];
     if (!apiKey) {
       throw new Error(`Missing ${invocation.provider.apiKeyEnv ?? 'OPENAI_API_KEY'} for OpenAI runtime.`);
     }
     const url = `${invocation.provider.baseUrl ?? 'https://api.openai.com/v1'}/responses`;
+    events?.onEvent({type: 'status', message: `POST ${url}`});
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -19,6 +20,7 @@ export const openAiAdapter: LlmRuntimeAdapter = {
       body: JSON.stringify(buildOpenAIResponsesRequest(invocation))
     });
     const raw = await response.json();
+    events?.onEvent({type: 'status', message: `OpenAI response ${response.status}.`});
     if (!response.ok) {
       throw new Error(`OpenAI request failed: ${response.status} ${JSON.stringify(raw)}`);
     }

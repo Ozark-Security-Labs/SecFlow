@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .secflow/runs/
+.secflow/cases/
 coverage/
 *.log
 *.tsbuildinfo

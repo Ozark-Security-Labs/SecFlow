@@ -53,6 +53,11 @@ const configSchema = z.object({
   outputs: z.object({
     directory: z.string()
   }),
+  runtime: z
+    .object({
+      streamEvents: z.boolean()
+    })
+    .default(defaultConfig.runtime),
   context: z.object({
     requireApproval: z.boolean(),
     maxBytes: z.number().int().positive(),
@@ -95,4 +100,18 @@ export async function writeDefaultConfig(cwd: string, options: {overwrite?: bool
   }
   await writeFile(configPath, createDefaultConfigYaml(), {encoding: 'utf8', flag: options.overwrite ? 'w' : 'wx'});
   return configPath;
+}
+
+export async function saveConfig(cwd: string, config: SecFlowConfig): Promise<{config: SecFlowConfig; path: string}> {
+  const validated = validateConfig(config);
+  const secflowDir = path.join(cwd, '.secflow');
+  await mkdir(secflowDir, {recursive: true});
+  const configPath = path.join(secflowDir, 'config.yaml');
+  await writeFile(configPath, YAML.stringify(validated), 'utf8');
+  return {config: validated, path: configPath};
+}
+
+export async function updateConfig(cwd: string, update: (config: SecFlowConfig) => SecFlowConfig): Promise<{config: SecFlowConfig; path: string}> {
+  const {config} = await loadConfig(cwd);
+  return saveConfig(cwd, update(config));
 }

@@ -31,8 +31,11 @@ describe('audit engine', () => {
     const run = await runAudit({targetPath, config, contextApproved: false});
     expect(run.findings.length).toBeGreaterThan(0);
     expect(run.toolResults.every((result) => result.skipped)).toBe(true);
+    expect(run.caseId).toBeTruthy();
+    expect(run.jsonReportPath).toBeTruthy();
     expect(await readFile(run.reportPath, 'utf8')).toContain('Business Logic Analysis');
     expect(await readFile(run.sarifPath, 'utf8')).toContain('SecFlow');
+    expect(await readFile(path.join(targetPath, '.secflow', 'cases', run.caseId!, 'case.json'), 'utf8')).toContain('"findings"');
   });
 
   it('emits audit events in order for a local-only run', async () => {
@@ -43,7 +46,20 @@ describe('audit engine', () => {
     expect(run.findings.length).toBeGreaterThan(0);
     expect(events.map((event) => event.type)).toContain('run:complete');
     expect(events.find((event) => event.type === 'llm:skipped' && event.reason === 'No default runtime configured.')).toBeTruthy();
-    expect(stepStarts(events)).toEqual(['initialize', 'profile', 'business-workflows', 'tools', 'reports']);
+    expect(stepStarts(events)).toEqual(['initialize', 'profile', 'repo-map', 'business-workflows', 'tools', 'finding-normalization', 'reports']);
+  });
+
+  it('writes patch draft artifacts only after explicit approval', async () => {
+    const targetPath = await createTarget();
+    const run = await runAudit({
+      targetPath,
+      config: missingToolConfig(),
+      remediationDraftApproved: true
+    });
+
+    expect(run.remediationDrafts?.length).toBeGreaterThan(0);
+    expect(run.remediationDrafts?.[0]?.artifactPath).toBeTruthy();
+    expect(await readFile(run.remediationDrafts![0]!.artifactPath!, 'utf8')).toContain('No repository files were edited');
   });
 
   it('emits context preview and skips LLM when approval is denied', async () => {

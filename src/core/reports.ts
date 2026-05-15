@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type {AuditRun, BusinessWorkflowModel, NormalizedFinding, RepoProfile, ToolRunResult} from './types.js';
+import type {AuditRun, BusinessWorkflowModel, NormalizedFinding, RemediationDraft, RepoProfile, ToolRunResult} from './types.js';
 
 export function renderMarkdownReport(run: Omit<AuditRun, 'reportPath' | 'sarifPath'>): string {
   const scannerFindings = run.findings.filter((finding) => finding.source !== 'business-logic');
@@ -27,12 +27,73 @@ export function renderMarkdownReport(run: Omit<AuditRun, 'reportPath' | 'sarifPa
     '## Tool Runs',
     renderToolRuns(run.toolResults),
     '',
+    '## Remediation Drafts',
+    renderRemediationDrafts(run.remediationDrafts ?? []),
+    '',
     '## LLM Runtime Activity',
-    run.llmResponses.length > 0
-      ? run.llmResponses.map((response) => `- ${response.runtime}${response.model ? ` (${response.model})` : ''}: ${firstLine(response.text)}`).join('\n')
-      : '- No LLM runtime was invoked. This can happen when no runtime is configured or context approval was not provided.',
+    renderLlmResponses(run.llmResponses),
+    '',
+    '## LLM Runtime Events',
+    renderLlmEvents(run.llmEvents ?? []),
     ''
   ].join('\n');
+}
+
+export function renderJsonReport(run: Omit<AuditRun, 'reportPath' | 'sarifPath'>): Record<string, unknown> {
+  return {
+    schema: 'secflow.audit-report.v1',
+    runId: run.runId,
+    caseId: run.caseId,
+    targetPath: run.targetPath,
+    generatedAt: new Date().toISOString(),
+    repository: run.profile,
+    repoMap: run.profile
+      ? {
+          manifests: run.profile.manifests,
+          frameworks: run.profile.likelyFrameworks,
+          notableDirectories: run.profile.notableDirectories,
+          extensionSummary: run.profile.extensions,
+          sampledFiles: run.profile.sampledFiles
+        }
+      : undefined,
+    business: run.business,
+    scannerFindings: run.findings.filter((finding) => finding.source !== 'business-logic'),
+    businessLogicHypotheses: run.findings.filter((finding) => finding.source === 'business-logic'),
+    toolResults: run.toolResults,
+    llmResponses: run.llmResponses.map((response) => ({
+      runtime: response.runtime,
+      model: response.model,
+      text: response.text,
+      usage: response.usage
+    })),
+    llmEvents: run.llmEvents ?? [],
+    remediationDrafts: run.remediationDrafts ?? []
+  };
+}
+
+export function renderPatchDrafts(findings: NormalizedFinding[]): RemediationDraft[] {
+  return findings.slice(0, 5).map((finding) => ({
+    id: `patch-draft:${finding.id}`,
+    findingId: finding.id,
+    title: `Patch draft for ${finding.title}`,
+    status: 'drafted',
+    createdAt: new Date().toISOString(),
+    summary: `Review and remediate ${finding.title}.`,
+    patch: [
+      `# Patch Draft: ${finding.title}`,
+      '',
+      `Finding: ${finding.id}`,
+      finding.path ? `Location: ${finding.path}${finding.line ? `:${finding.line}` : ''}` : 'Location: repository-wide',
+      '',
+      '## Suggested Change',
+      finding.recommendation,
+      '',
+      '## Validation',
+      ...(finding.validationSteps?.length ? finding.validationSteps.map((step) => `- ${step}`) : ['- Add or update tests for the affected workflow.', '- Re-run the relevant scanner and application test suite.']),
+      '',
+      'No repository files were edited by SecFlow.'
+    ].join('\n')
+  }));
 }
 
 export function renderSarif(findings: NormalizedFinding[]): Record<string, unknown> {
@@ -119,12 +180,44 @@ function renderFindings(findings: NormalizedFinding[], empty: string): string {
         finding.path ? `- Location: ${finding.path}${finding.line ? `:${finding.line}` : ''}` : undefined,
         `- Description: ${finding.description}`,
         finding.evidence.length > 0 ? `- Evidence: ${finding.evidence.join('; ')}` : undefined,
+        finding.assumptions?.length ? `- Assumptions: ${finding.assumptions.join('; ')}` : undefined,
+        finding.exploitPath ? `- Exploit path: ${finding.exploitPath}` : undefined,
+        finding.validationSteps?.length ? `- Validation steps: ${finding.validationSteps.join('; ')}` : undefined,
         `- Recommendation: ${finding.recommendation}`
       ]
         .filter(Boolean)
         .join('\n')
     )
     .join('\n\n');
+}
+
+function renderRemediationDrafts(drafts: RemediationDraft[]): string {
+  if (drafts.length === 0) {
+    return 'No patch drafts were generated.';
+  }
+  return drafts.map((draft) => `- ${draft.title}: ${draft.artifactPath ?? draft.status}`).join('\n');
+}
+
+function renderLlmResponses(responses: AuditRun['llmResponses']): string {
+  if (responses.length === 0) {
+    return '- No LLM runtime was invoked. This can happen when no runtime is configured or context approval was not provided.';
+  }
+  return responses
+    .map((response) =>
+      [
+        `### ${response.runtime}${response.model ? ` (${response.model})` : ''}`,
+        '',
+        truncate(response.text.trim(), 8000)
+      ].join('\n')
+    )
+    .join('\n\n');
+}
+
+function renderLlmEvents(events: NonNullable<AuditRun['llmEvents']>): string {
+  if (events.length === 0) {
+    return '- No LLM runtime events were recorded.';
+  }
+  return events.slice(-20).map((event) => `- ${event.timestamp} ${event.runtime}/${event.taskId} ${event.type}: ${event.message}`).join('\n');
 }
 
 function renderToolRuns(results: ToolRunResult[]): string {
@@ -140,8 +233,11 @@ function listOrNone(values: string[]): string {
   return values.length > 0 ? values.join(', ') : 'none detected';
 }
 
-function firstLine(value: string): string {
-  return value.trim().split(/\r?\n/)[0]?.slice(0, 160) || 'completed';
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength).trimEnd()}\n\n[LLM output truncated; see llm-responses.json for the full response.]`;
 }
 
 function sarifLevel(severity: NormalizedFinding['severity']): 'none' | 'note' | 'warning' | 'error' {

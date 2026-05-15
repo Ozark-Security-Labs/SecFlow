@@ -5,6 +5,12 @@ export type FindingSource = 'semgrep' | 'trivy' | 'joern' | 'business-logic' | '
 
 export type RuntimeKind = 'openai' | 'anthropic' | 'openrouter' | 'codex-cli' | 'claude-code-cli';
 
+export type WorkflowStepState = 'pending' | 'running' | 'waiting-for-approval' | 'skipped' | 'complete' | 'failed';
+
+export type ApprovalKind = 'llm-context' | 'agent-context' | 'patch-draft';
+
+export type ArtifactKind = 'json' | 'markdown' | 'sarif' | 'patch-draft' | 'raw-log' | 'text';
+
 export interface ModelProfile {
   provider: string;
   model: string;
@@ -50,6 +56,9 @@ export interface SecFlowConfig {
   outputs: {
     directory: string;
   };
+  runtime: {
+    streamEvents: boolean;
+  };
   context: {
     requireApproval: boolean;
     maxBytes: number;
@@ -67,6 +76,20 @@ export interface RepoProfile {
   securityRelevantFiles: string[];
   likelyFrameworks: string[];
   notableDirectories: string[];
+  sampledFiles: Array<{
+    path: string;
+    bytes: number;
+    signals: string[];
+  }>;
+}
+
+export interface RepoMap {
+  generatedAt: string;
+  root: string;
+  manifests: string[];
+  frameworks: string[];
+  notableDirectories: string[];
+  extensionSummary: Record<string, number>;
   sampledFiles: Array<{
     path: string;
     bytes: number;
@@ -97,7 +120,10 @@ export interface BusinessRisk {
   workflow: string;
   hypothesis: string;
   evidence: string[];
+  assumptions?: string[];
+  exploitPath?: string;
   validationSteps: string[];
+  recommendation?: string;
 }
 
 export interface NormalizedFinding {
@@ -110,6 +136,9 @@ export interface NormalizedFinding {
   line?: number;
   description: string;
   evidence: string[];
+  assumptions?: string[];
+  exploitPath?: string;
+  validationSteps?: string[];
   recommendation: string;
   cwe?: string[];
   references?: string[];
@@ -128,6 +157,15 @@ export interface ToolRunResult {
   rawJsonPath?: string;
   message: string;
   findings: NormalizedFinding[];
+}
+
+export interface EvidenceItem {
+  id: string;
+  kind: 'file' | 'scanner' | 'business-signal' | 'llm' | 'manual';
+  source: string;
+  summary: string;
+  artifactPath?: string;
+  findingIds: string[];
 }
 
 export interface LlmTask {
@@ -149,26 +187,113 @@ export interface LlmResponse {
   raw?: unknown;
 }
 
+export interface LlmRuntimeEvent {
+  timestamp: string;
+  runtime: string;
+  taskId: string;
+  promptId: string;
+  type: 'start' | 'status' | 'message' | 'stdout' | 'stderr' | 'complete' | 'error';
+  message: string;
+  data?: Record<string, unknown>;
+}
+
+export interface ApprovalRecord {
+  id: string;
+  kind: ApprovalKind;
+  requestedAt: string;
+  resolvedAt?: string;
+  approved?: boolean;
+  reason?: string;
+  artifactPath?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ArtifactRecord {
+  id: string;
+  kind: ArtifactKind;
+  path: string;
+  createdAt: string;
+  bytes: number;
+  description?: string;
+}
+
+export interface WorkflowStepRecord {
+  id: string;
+  title: string;
+  state: WorkflowStepState;
+  dependencies: string[];
+  startedAt?: string;
+  completedAt?: string;
+  approvalKind?: ApprovalKind;
+  error?: string;
+  artifactIds: string[];
+}
+
+export interface RemediationDraft {
+  id: string;
+  findingId: string;
+  title: string;
+  status: 'drafted' | 'skipped';
+  createdAt: string;
+  artifactPath?: string;
+  summary: string;
+  patch: string;
+}
+
+export interface CaseFile {
+  version: 1;
+  caseId: string;
+  title: string;
+  targetPath: string;
+  createdAt: string;
+  updatedAt: string;
+  status: 'open' | 'complete' | 'failed';
+  workflow: WorkflowStepRecord[];
+  events: AuditEvent[];
+  artifacts: ArtifactRecord[];
+  evidence: EvidenceItem[];
+  approvals: ApprovalRecord[];
+  profile?: RepoProfile;
+  repoMap?: RepoMap;
+  business?: BusinessWorkflowModel;
+  toolResults: ToolRunResult[];
+  findings: NormalizedFinding[];
+  llmResponses: LlmResponse[];
+  llmEvents: LlmRuntimeEvent[];
+  remediationDrafts: RemediationDraft[];
+  reportPath?: string;
+  jsonReportPath?: string;
+  sarifPath?: string;
+}
+
 export interface AuditRun {
   runId: string;
+  caseId?: string;
   targetPath: string;
   runDir: string;
   profile: RepoProfile;
+  repoMap?: RepoMap;
   business: BusinessWorkflowModel;
   toolResults: ToolRunResult[];
   findings: NormalizedFinding[];
   llmResponses: LlmResponse[];
+  llmEvents?: LlmRuntimeEvent[];
+  remediationDrafts?: RemediationDraft[];
   reportPath: string;
+  jsonReportPath?: string;
   sarifPath: string;
 }
 
 export type AuditStep =
   | 'initialize'
   | 'profile'
+  | 'repo-map'
   | 'business-workflows'
   | 'tools'
+  | 'finding-normalization'
   | 'context-preview'
   | 'llm'
+  | 'remediation-drafting'
   | 'reports'
   | 'complete'
   | 'error';
@@ -208,6 +333,12 @@ export type AuditEvent =
       step: 'llm';
       timestamp: string;
       reason: string;
+    }
+  | {
+      type: 'llm:runtime-event';
+      step: 'llm';
+      timestamp: string;
+      event: LlmRuntimeEvent;
     }
   | {
       type: 'run:complete';

@@ -1,8 +1,9 @@
 version: 1
+defaultRuntime: codex
 providers:
   openai:
     kind: openai
-    enabled: false
+    enabled: true
     apiKeyEnv: OPENAI_API_KEY
     defaultModel: gpt-5.4
   anthropic:
@@ -17,7 +18,7 @@ providers:
     defaultModel: openai/gpt-5.4
   codex:
     kind: codex-cli
-    enabled: false
+    enabled: true
     command: codex
     defaultModel: gpt-5.4
   claude-code:
@@ -27,7 +28,7 @@ providers:
     defaultModel: sonnet
 modelProfiles:
   default:
-    provider: openai
+    provider: codex
     model: gpt-5.4
     temperature: 0.2
     maxTokens: 4000
@@ -71,6 +72,8 @@ playbooks:
   default: playbooks/default-audit.yaml
 outputs:
   directory: .secflow
+runtime:
+  streamEvents: true
 context:
   requireApproval: true
   maxBytes: 750000

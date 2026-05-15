@@ -95,6 +95,9 @@ export const defaultConfig: SecFlowConfig = {
   outputs: {
     directory: '.secflow'
   },
+  runtime: {
+    streamEvents: false
+  },
   context: {
     requireApproval: true,
     maxBytes: 750000,

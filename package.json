@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx src/index.tsx",
+    "dev": "node --no-deprecation --import tsx src/index.tsx",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type {LlmResponse, LlmTask, SecFlowConfig} from '../core/types.js';
+import type {LlmResponse, LlmRuntimeEvent, LlmTask, SecFlowConfig} from '../core/types.js';
 import {anthropicAdapter} from './adapters/anthropic.js';
 import {claudeCodeCliAdapter} from './adapters/claudeCodeCli.js';
 import {codexCliAdapter} from './adapters/codexCli.js';
@@ -19,7 +19,12 @@ export function listRuntimeSummaries(config: SecFlowConfig): Array<{name: string
   }));
 }
 
-export async function invokeConfiguredRuntime(config: SecFlowConfig, task: LlmTask, runtimeName = config.defaultRuntime): Promise<LlmResponse | undefined> {
+export async function invokeConfiguredRuntime(
+  config: SecFlowConfig,
+  task: LlmTask,
+  runtimeName = config.defaultRuntime,
+  onRuntimeEvent?: (event: LlmRuntimeEvent) => void
+): Promise<LlmResponse | undefined> {
   if (!runtimeName) {
     return undefined;
   }
@@ -38,5 +43,23 @@ export async function invokeConfiguredRuntime(config: SecFlowConfig, task: LlmTa
   if (!adapter) {
     throw new Error(`No LLM runtime adapter is registered for ${provider.kind}.`);
   }
-  return adapter.invoke({providerName: runtimeName, provider, modelProfile, task});
+  const emit = config.runtime.streamEvents
+    ? (event: Omit<LlmRuntimeEvent, 'timestamp' | 'runtime' | 'taskId' | 'promptId'>) =>
+        onRuntimeEvent?.({
+          timestamp: new Date().toISOString(),
+          runtime: runtimeName,
+          taskId: task.id,
+          promptId: task.promptId,
+          ...event
+        })
+    : undefined;
+  emit?.({type: 'start', message: `Starting ${runtimeName} for ${task.promptId}.`});
+  try {
+    const response = await adapter.invoke({providerName: runtimeName, provider, modelProfile, task}, emit ? {onEvent: emit} : undefined);
+    emit?.({type: 'complete', message: `Completed ${runtimeName} for ${task.promptId}.`});
+    return response;
+  } catch (error) {
+    emit?.({type: 'error', message: error instanceof Error ? error.message : String(error)});
+    throw error;
+  }
 }

@@ -13,4 +13,12 @@ describe('PromptRegistry', () => {
     const registry = new PromptRegistry();
     expect(() => registry.get('generic-security-helper')).toThrow(/Unknown prompt id/);
   });
+
+  it('gives workflow extraction evidence and output-format instructions', () => {
+    const registry = new PromptRegistry();
+    const prompt = registry.get('workflow-extraction');
+    expect(prompt).toContain('normalized SecFlow finding');
+    expect(prompt).toContain('Evidence entries must cite repository paths');
+    expect(prompt).toContain('Return only JSON matching the provided schema');
+  });
 });

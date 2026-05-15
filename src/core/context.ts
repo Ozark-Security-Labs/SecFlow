@@ -18,14 +18,23 @@ export function buildContextPackage(profile: RepoProfile, business: BusinessWork
 }
 
 export function redactContext<T>(value: T, redactionPatterns: string[]): T {
-  const text = JSON.stringify(value);
-  let redacted = text;
-  for (const pattern of redactionPatterns) {
-    redacted = redacted.replace(new RegExp(pattern, 'gi'), '[REDACTED]');
-  }
-  return JSON.parse(redacted) as T;
+  const patterns = redactionPatterns.map((pattern) => new RegExp(pattern, 'gi'));
+  return redactValue(value, patterns) as T;
 }
 
 export function contextSizeBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), 'utf8');
+}
+
+function redactValue(value: unknown, patterns: RegExp[]): unknown {
+  if (typeof value === 'string') {
+    return patterns.reduce((current, pattern) => current.replace(pattern, '[REDACTED]'), value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactValue(item, patterns));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactValue(item, patterns)]));
+  }
+  return value;
 }

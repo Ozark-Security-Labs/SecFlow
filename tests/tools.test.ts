@@ -46,4 +46,9 @@ describe('tool normalization', () => {
     );
     expect(findings[0]).toMatchObject({source: 'trivy', severity: 'high', path: 'package-lock.json'});
   });
+
+  it('treats malformed scanner output as no findings', () => {
+    expect(normalizeSemgrepFindings('not-json')).toEqual([]);
+    expect(normalizeTrivyFindings('{')).toEqual([]);
+  });
 });

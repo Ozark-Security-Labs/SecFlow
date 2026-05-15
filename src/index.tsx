@@ -31,10 +31,19 @@ program
   .command('audit')
   .argument('[target]', 'Target repository path', '.')
   .option('--approve-context', 'Approve sending the curated context package to the configured LLM runtime')
+  .option('--approve-remediation-drafts', 'Approve generating reviewable remediation patch draft artifacts')
   .option('--runtime <name>', 'Override configured runtime for this run')
   .description('Run a SecFlow audit and write local artifacts')
-  .action(async (target: string, options: {approveContext?: boolean; runtime?: string}) => {
-    console.log(await auditCommand({cwd: process.cwd(), target, approveContext: options.approveContext, runtime: options.runtime}));
+  .action(async (target: string, options: {approveContext?: boolean; approveRemediationDrafts?: boolean; runtime?: string}) => {
+    console.log(
+      await auditCommand({
+        cwd: process.cwd(),
+        target,
+        approveContext: options.approveContext,
+        approveRemediationDrafts: options.approveRemediationDrafts,
+        runtime: options.runtime
+      })
+    );
   });
 
 const tools = program.command('tools').description('Inspect deterministic security tool integrations');

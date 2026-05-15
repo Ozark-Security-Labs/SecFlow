@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type {LlmResponse, LlmTask, ModelProfile, ProviderConfig} from '../core/types.js';
+import type {LlmResponse, LlmRuntimeEvent, LlmTask, ModelProfile, ProviderConfig} from '../core/types.js';
 
 export interface RuntimeInvocation {
   providerName: string;
@@ -10,7 +10,11 @@ export interface RuntimeInvocation {
 
 export interface LlmRuntimeAdapter {
   kind: ProviderConfig['kind'];
-  invoke(invocation: RuntimeInvocation): Promise<LlmResponse>;
+  invoke(invocation: RuntimeInvocation, events?: LlmRuntimeEventSink): Promise<LlmResponse>;
+}
+
+export interface LlmRuntimeEventSink {
+  onEvent: (event: Omit<LlmRuntimeEvent, 'timestamp' | 'runtime' | 'taskId' | 'promptId'>) => void;
 }
 
 export function serializeTaskForPrompt(task: LlmTask): string {
@@ -19,14 +23,17 @@ export function serializeTaskForPrompt(task: LlmTask): string {
     `Prompt ID: ${task.promptId}`,
     '',
     task.userPrompt,
+    task.outputSchema ? ['', 'Return only JSON matching this JSON Schema:', JSON.stringify(task.outputSchema, null, 2)].join('\n') : undefined,
     '',
     'Context JSON:',
     JSON.stringify(task.context, null, 2)
-  ].join('\n');
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join('\n');
 }
 
 export function parseMaybeJson(value: string): unknown | undefined {
-  const trimmed = value.trim();
+  const trimmed = stripJsonFence(value.trim());
   if (!trimmed) {
     return undefined;
   }
@@ -35,4 +42,9 @@ export function parseMaybeJson(value: string): unknown | undefined {
   } catch {
     return undefined;
   }
+}
+
+function stripJsonFence(value: string): string {
+  const match = value.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return match ? match[1]!.trim() : value;
 }

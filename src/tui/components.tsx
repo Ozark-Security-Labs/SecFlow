@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import React from 'react';
 import {Box, Text} from 'ink';
-import type {AuditEvent, AuditRun, AuditStep, ContextPreview, NormalizedFinding, ToolRunResult} from '../core/types.js';
+import SelectInput from 'ink-select-input';
+import type {AuditEvent, AuditRun, AuditStep, ContextPreview, LlmRuntimeEvent, NormalizedFinding, ToolRunResult} from '../core/types.js';
 import type {PreflightData} from './preflight.js';
-import {fitText, useTerminalSize, valueWidth} from './layout.js';
+import {fitText, sectionContentWidth, useTerminalSize, valueWidth} from './layout.js';
 import {severityColor, sourceColor, sourceLabel, statusColor, theme} from './theme.js';
 
 export function Section({title, children}: {title: string; children: React.ReactNode}): React.ReactElement {
@@ -28,7 +29,7 @@ export function Section({title, children}: {title: string; children: React.React
 
 export function StatusRow({label, value, color = 'white'}: {label: string; value: string | number; color?: string}): React.ReactElement {
   const terminal = useTerminalSize();
-  const text = fitText(String(value), valueWidth(terminal.columns, label.length));
+  const text = fitText(String(value), valueWidth(terminal.columns, label.length, !terminal.compact));
   return (
     <Text>
       <Text color={theme.muted}>{label}: </Text>
@@ -125,48 +126,99 @@ export function ContextApprovalSummary({preview}: {preview: ContextPreview}): Re
 }
 
 export function ResultsSummary({run}: {run: AuditRun}): React.ReactElement {
-  const terminal = useTerminalSize();
   const scannerFindings = run.findings.filter((finding) => finding.source !== 'business-logic');
   const businessFindings = run.findings.filter((finding) => finding.source === 'business-logic');
-  const skippedTools = run.toolResults.filter((result) => result.skipped);
-  const showDetails = !terminal.compact;
 
   return (
-    <>
-      <Section title="Results">
-        <StatusRow label="Run" value={run.runId} />
-        <StatusRow label="Files profiled" value={run.profile.fileCount} />
-        <StatusRow label="Business hypotheses" value={businessFindings.length} color={businessFindings.length > 0 ? theme.warning : theme.success} />
-        <StatusRow label="Scanner findings" value={scannerFindings.length} color={scannerFindings.length > 0 ? theme.warning : theme.success} />
-        <StatusRow label="LLM runtime" value={run.llmResponses.length > 0 ? 'invoked' : 'not invoked'} />
-        <StatusRow label="Report" value={run.reportPath} />
-        <StatusRow label="SARIF" value={run.sarifPath} />
-      </Section>
-      {showDetails ? <FindingSummary title="Top Business Logic Items" findings={businessFindings} /> : null}
-      {showDetails ? <ToolOutcomeSummary results={run.toolResults} /> : null}
-      {showDetails && skippedTools.length > 0 && (
-        <Section title="Skipped Tools">
-          {skippedTools.map((result) => (
-            <Text key={result.tool}>
-              <StatusBadge status="skipped" /> {result.tool}: {friendlyToolMessage(result)}
-            </Text>
-          ))}
-        </Section>
-      )}
-    </>
+    <Section title="Results">
+      <StatusRow label="Run" value={run.runId} />
+      <StatusRow label="Case" value={run.caseId ?? run.runId} />
+      <StatusRow label="Files" value={run.profile.fileCount} />
+      <StatusRow label="Business hypotheses" value={businessFindings.length} color={businessFindings.length > 0 ? theme.warning : theme.success} />
+      <StatusRow label="Scanner findings" value={scannerFindings.length} color={scannerFindings.length > 0 ? theme.warning : theme.success} />
+      <StatusRow label="LLM runtime" value={run.llmResponses.length > 0 ? 'invoked' : 'not invoked'} />
+      <StatusRow label="Patch drafts" value={run.remediationDrafts?.length ?? 0} />
+    </Section>
   );
 }
 
-export function FindingSummary({title, findings}: {title: string; findings: NormalizedFinding[]}): React.ReactElement {
-  const terminal = useTerminalSize();
+export function ReportArtifactsSummary({run}: {run: AuditRun}): React.ReactElement {
   return (
-    <Section title={title}>
-      {findings.length === 0 ? (
-        <Text color={theme.muted}>No findings in this category.</Text>
+    <Section title="Report Artifacts">
+      <StatusRow label="Markdown" value={run.reportPath} />
+      <StatusRow label="JSON" value={run.jsonReportPath ?? 'not written'} />
+      <StatusRow label="SARIF" value={run.sarifPath} />
+      <StatusRow label="Case file" value={caseFilePath(run)} />
+      <StatusRow label="Patch drafts" value={run.remediationDrafts?.length ? patchDraftDirectory(run) : 'not generated'} />
+    </Section>
+  );
+}
+
+export function RepoMapSummary({run}: {run: AuditRun}): React.ReactElement {
+  const frameworks = run.repoMap?.frameworks ?? run.profile.likelyFrameworks;
+  const directories = run.repoMap?.notableDirectories ?? run.profile.notableDirectories;
+  const samples = run.repoMap?.sampledFiles ?? run.profile.sampledFiles;
+  return (
+    <Section title="Repo Map">
+      <StatusRow label="Frameworks" value={frameworks.length > 0 ? frameworks.join(', ') : 'none detected'} />
+      <StatusRow label="Directories" value={directories.length > 0 ? directories.join(', ') : 'none detected'} />
+      <StatusRow label="Samples" value={samples.length} />
+    </Section>
+  );
+}
+
+export function WorkflowSummary({run}: {run: AuditRun}): React.ReactElement {
+  return (
+    <Section title="Workflows">
+      <StatusRow label="Actors" value={run.business.actors.length > 0 ? run.business.actors.join(', ') : 'none detected'} />
+      <StatusRow label="Entry points" value={run.business.entryPoints.length > 0 ? run.business.entryPoints.join(', ') : 'none detected'} />
+      <StatusRow label="Review questions" value={run.business.reviewQuestions.length} />
+    </Section>
+  );
+}
+
+export function RemediationSummary({drafts}: {drafts: NonNullable<AuditRun['remediationDrafts']>}): React.ReactElement {
+  const terminal = useTerminalSize();
+  const width = sectionContentWidth(terminal.columns, !terminal.compact);
+  return (
+    <Section title="Remediation Drafts">
+      {drafts.length === 0 ? (
+        <Text color={theme.muted}>No patch drafts were generated.</Text>
       ) : (
-        findings.slice(0, 5).map((finding) => (
-          <Text key={finding.id}>
-            <SeverityBadge severity={finding.severity} /> <SourceBadge source={finding.source} /> {fitText(finding.title, terminal.columns - 26)}
+        drafts.slice(0, 5).map((draft) => <Text key={draft.id}>{fitText(`${draft.title}: ${draft.artifactPath ?? draft.status}`, width)}</Text>)
+      )}
+    </Section>
+  );
+}
+
+export function LlmActivitySummary({run}: {run: AuditRun}): React.ReactElement {
+  const terminal = useTerminalSize();
+  const width = sectionContentWidth(terminal.columns, !terminal.compact);
+  return (
+    <Section title="LLM Activity">
+      {run.llmResponses.length === 0 ? (
+        <Text color={theme.muted}>No LLM runtime responses were recorded.</Text>
+      ) : (
+        run.llmResponses.slice(0, 4).map((response, index) => (
+          <Text key={`${response.runtime}-${index}`}>{fitText(`${response.runtime}${response.model ? `/${response.model}` : ''}: ${response.text.replace(/\s+/g, ' ').trim()}`, width)}</Text>
+        ))
+      )}
+    </Section>
+  );
+}
+
+export function LlmRuntimeEventsSummary({events}: {events: LlmRuntimeEvent[]}): React.ReactElement {
+  const terminal = useTerminalSize();
+  const width = sectionContentWidth(terminal.columns, !terminal.compact);
+  const visible = events.slice(terminal.compact ? -5 : -10);
+  return (
+    <Section title="LLM Runtime Events">
+      {visible.length === 0 ? (
+        <Text color={theme.muted}>Runtime event streaming is disabled or no events were recorded.</Text>
+      ) : (
+        visible.map((event, index) => (
+          <Text key={`${event.timestamp}-${index}`}>
+            {fitText(`${event.runtime}/${event.taskId} ${event.type}: ${event.message.replace(/\s+/g, ' ').trim()}`, width)}
           </Text>
         ))
       )}
@@ -174,7 +226,85 @@ export function FindingSummary({title, findings}: {title: string; findings: Norm
   );
 }
 
+export function FindingSummary({title, findings}: {title: string; findings: NormalizedFinding[]}): React.ReactElement {
+  const terminal = useTerminalSize();
+  const width = sectionContentWidth(terminal.columns, !terminal.compact);
+  return (
+    <Section title={title}>
+      {findings.length === 0 ? (
+        <Text color={theme.muted}>No findings in this category.</Text>
+      ) : (
+        findings.slice(0, 5).map((finding) => (
+          <Text key={finding.id}>
+            <SeverityBadge severity={finding.severity} /> <SourceBadge source={finding.source} /> {fitText(finding.title, width - 24)}
+          </Text>
+        ))
+      )}
+    </Section>
+  );
+}
+
+type FindingAction = `finding:${number}` | `findings-page:${number}` | 'overview' | 'home' | 'quit';
+
+export function FindingsMenu({
+  businessFindings,
+  scannerFindings,
+  page = 0,
+  onSelect
+}: {
+  businessFindings: NormalizedFinding[];
+  scannerFindings: NormalizedFinding[];
+  page?: number;
+  onSelect: (action: FindingAction) => void;
+}): React.ReactElement {
+  const terminal = useTerminalSize();
+  const findings = [...businessFindings, ...scannerFindings];
+  const width = sectionContentWidth(terminal.columns, !terminal.compact);
+  const pageSize = terminal.compact ? 12 : 18;
+  const pageCount = Math.max(1, Math.ceil(findings.length / pageSize));
+  const currentPage = Math.min(Math.max(0, page), pageCount - 1);
+  const start = currentPage * pageSize;
+  const visibleFindings = findings.slice(start, start + pageSize);
+  const items: Array<{label: string; value: FindingAction}> = [
+    ...visibleFindings.map((finding, index) => ({
+      label: fitText(`${String(start + index + 1).padStart(3, ' ')} ${finding.severity.toUpperCase()} ${sourceLabel(finding.source)} ${finding.title}`, width - 4),
+      value: `finding:${start + index}` as const
+    })),
+    ...(currentPage > 0 ? [{label: `Previous page (${currentPage}/${pageCount})`, value: `findings-page:${currentPage - 1}` as const}] : []),
+    ...(currentPage < pageCount - 1 ? [{label: `Next page (${currentPage + 2}/${pageCount})`, value: `findings-page:${currentPage + 1}` as const}] : []),
+    {label: 'Back to overview', value: 'overview'},
+    {label: 'Back home', value: 'home'},
+    {label: 'Quit', value: 'quit'}
+  ];
+  return (
+    <Section title="Select Finding">
+      <Text color={theme.muted}>
+        {findings.length} findings · page {currentPage + 1}/{pageCount} · business {businessFindings.length} · scanner {scannerFindings.length}
+      </Text>
+      {findings.length === 0 ? <Text color={theme.muted}>No findings were produced.</Text> : null}
+      <SelectInput<FindingAction> key={`findings-${currentPage}-${findings.length}`} items={items} onSelect={(item) => onSelect(item.value)} />
+    </Section>
+  );
+}
+
+export function FindingDetail({finding, reportPath}: {finding: NormalizedFinding; reportPath: string}): React.ReactElement {
+  const terminal = useTerminalSize();
+  const width = sectionContentWidth(terminal.columns, !terminal.compact);
+  const lines = terminal.compact
+    ? compactFindingDetailLines(finding, reportPath).map((line) => fitText(line, width))
+    : findingDetailLines(finding, reportPath).flatMap((line) => wrapDetailLine(line, width));
+  return (
+    <Section title="Finding Detail">
+      {lines.map((line, index) => (
+        <Text key={`finding-detail-${index}`}>{line}</Text>
+      ))}
+    </Section>
+  );
+}
+
 export function ToolOutcomeSummary({results}: {results: ToolRunResult[]}): React.ReactElement {
+  const terminal = useTerminalSize();
+  const width = sectionContentWidth(terminal.columns, !terminal.compact);
   return (
     <Section title="Tool Outcomes">
       {results.length === 0 ? (
@@ -182,7 +312,7 @@ export function ToolOutcomeSummary({results}: {results: ToolRunResult[]}): React
       ) : (
         results.map((result) => (
           <Text key={result.tool}>
-            <StatusBadge status={result.available ? (result.skipped ? 'skipped' : 'done') : 'missing'} /> {result.tool}: {result.findings.length} findings
+            <StatusBadge status={result.available ? (result.skipped ? 'skipped' : 'done') : 'missing'} /> {fitText(`${result.tool}: ${result.findings.length} findings`, width - 11)}
           </Text>
         ))
       )}
@@ -194,26 +324,44 @@ export function ProgressRail({events}: {events: AuditEvent[]}): React.ReactEleme
   const terminal = useTerminalSize();
   const steps: Array<{step: AuditStep; label: string}> = [
     {step: 'profile', label: 'Profile'},
+    {step: 'repo-map', label: terminal.narrow ? 'Map' : 'Repo Map'},
     {step: 'business-workflows', label: terminal.narrow ? 'Biz' : 'Business Logic'},
     {step: 'tools', label: 'Tools'},
+    {step: 'finding-normalization', label: terminal.narrow ? 'Find' : 'Findings'},
     {step: 'llm', label: terminal.narrow ? 'LLM' : 'LLM Review'},
+    {step: 'remediation-drafting', label: terminal.narrow ? 'Fix' : 'Patch Drafts'},
     {step: 'reports', label: 'Reports'}
   ];
+  if (terminal.compact) {
+    const firstRow = steps.slice(0, 4).map((step) => compactStep(stepStatus(events, step.step), step.label)).join('  ');
+    const secondRow = steps.slice(4).map((step) => compactStep(stepStatus(events, step.step), step.label)).join('  ');
+    return (
+      <Section title="Audit Steps">
+        <Text>{fitText(firstRow, sectionContentWidth(terminal.columns, false))}</Text>
+        <Text>{fitText(secondRow, sectionContentWidth(terminal.columns, false))}</Text>
+      </Section>
+    );
+  }
   return (
     <Section title="Audit Steps">
-      <Text>
-        {steps.map((step, index) => (
-          <React.Fragment key={step.step}>
-            <StatusBadge status={stepStatus(events, step.step)} /> {step.label}
-            {index < steps.length - 1 ? <Text color={theme.muted}> -&gt; </Text> : null}
-          </React.Fragment>
-        ))}
-      </Text>
+      {steps.map((step) => (
+        <Text key={step.step}>
+          <StatusBadge status={stepStatus(events, step.step)} /> {step.label}
+        </Text>
+      ))}
     </Section>
   );
 }
 
+function compactStep(status: ReturnType<typeof stepStatus>, label: string): string {
+  const marker = status === 'done' ? '✓' : status === 'running' ? '…' : status === 'skipped' ? '-' : status === 'error' ? '!' : '·';
+  return `${marker} ${label}`;
+}
+
 function renderEvent(event: AuditEvent): string {
+  if (event.type === 'llm:runtime-event') {
+    return `${event.event.runtime}/${event.event.taskId}: ${event.event.message}`;
+  }
   if (event.type === 'tool:complete') {
     return `${event.result.tool}: ${event.result.skipped ? 'skipped' : 'completed'} (${event.result.findings.length} findings)`;
   }
@@ -257,6 +405,110 @@ function friendlyToolMessage(result: ToolRunResult): string {
     return `${result.message} Install ${result.tool} or disable it in .secflow/config.yaml.`;
   }
   return result.message;
+}
+
+function caseFilePath(run: AuditRun): string {
+  return `${run.runDir.replace(/\/artifacts$/, '')}/case.json`;
+}
+
+function patchDraftDirectory(run: AuditRun): string {
+  const artifactPath = run.remediationDrafts?.find((draft) => draft.artifactPath)?.artifactPath;
+  return artifactPath ? artifactPath.replace(/\/[^/]+$/, '') : `${run.runDir}/patch-drafts`;
+}
+
+function formatLocation(finding: NormalizedFinding): string {
+  if (!finding.path) {
+    return 'repository-wide';
+  }
+  return finding.line ? `${finding.path}:${finding.line}` : finding.path;
+}
+
+function analysisLines(finding: NormalizedFinding): string[] {
+  return [
+    `Recommendation: ${finding.recommendation}`,
+    finding.exploitPath ? `Exploit path: ${finding.exploitPath}` : undefined,
+    ...(finding.assumptions?.map((assumption) => `Assumption: ${assumption}`) ?? []),
+    ...(finding.validationSteps?.map((step) => `Validation: ${step}`) ?? []),
+    finding.metadata ? `Metadata keys: ${Object.keys(finding.metadata).join(', ') || 'none'}` : undefined
+  ].filter((line): line is string => Boolean(line));
+}
+
+function findingDetailLines(finding: NormalizedFinding, reportPath: string): string[] {
+  return [
+    `Title: ${finding.title}`,
+    `Source: ${sourceLabel(finding.source)}`,
+    `Severity: ${finding.severity}`,
+    `Confidence: ${Math.round(finding.confidence * 100)}%`,
+    `Location: ${formatLocation(finding)}`,
+    `CWE: ${finding.cwe?.join(', ') ?? 'none'}`,
+    `Description: ${finding.description}`,
+    'Evidence:',
+    ...(finding.evidence.length > 0 ? finding.evidence.map((item) => `- ${item}`) : ['- No evidence recorded.']),
+    'Analysis:',
+    ...analysisLines(finding).map((line) => `- ${line}`),
+    'References:',
+    ...(finding.references?.length ? finding.references.map((reference) => `- ${reference}`) : [`- Full report JSON: ${reportPath}`])
+  ];
+}
+
+function compactFindingDetailLines(finding: NormalizedFinding, reportPath: string): string[] {
+  const evidence = finding.evidence.length > 0 ? finding.evidence.slice(0, 2) : ['No evidence recorded.'];
+  const validation = finding.validationSteps?.slice(0, 2) ?? [];
+  return [
+    `Title: ${finding.title}`,
+    `Severity: ${finding.severity} / Source: ${sourceLabel(finding.source)} / Confidence: ${Math.round(finding.confidence * 100)}%`,
+    `Location: ${formatLocation(finding)}`,
+    `Description: ${finding.description}`,
+    'Evidence:',
+    ...evidence.map((item) => `- ${item}`),
+    finding.evidence.length > evidence.length ? `- ${finding.evidence.length - evidence.length} more evidence items in the JSON report.` : undefined,
+    ...(finding.assumptions?.slice(0, 1).map((assumption) => `Assumption: ${assumption}`) ?? []),
+    `Recommendation: ${finding.recommendation}`,
+    finding.exploitPath ? `Exploit path: ${finding.exploitPath}` : undefined,
+    ...validation.map((step) => `Validation: ${step}`),
+    `Full details: ${reportPath}`
+  ].filter((line): line is string => Boolean(line));
+}
+
+function wrapDetailLine(value: string, width: number): string[] {
+  const maxWidth = Math.max(12, width);
+  const continuation = value.startsWith('- ') ? '  ' : '';
+  const words = value.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    const prefix = lines.length === 0 ? '' : continuation;
+    const candidate = current ? `${current} ${word}` : `${prefix}${word}`;
+    if (candidate.length <= maxWidth) {
+      current = candidate;
+      continue;
+    }
+    if (current) {
+      lines.push(current);
+      current = '';
+    }
+    if (word.length <= maxWidth - continuation.length) {
+      current = `${continuation}${word}`;
+      continue;
+    }
+    for (const chunk of chunkWord(word, maxWidth - continuation.length)) {
+      lines.push(`${continuation}${chunk}`);
+    }
+  }
+
+  if (current) {
+    lines.push(current);
+  }
+  return lines.length > 0 ? lines : [''];
+}
+
+function chunkWord(value: string, size: number): string[] {
+  const chunks: string[] = [];
+  for (let index = 0; index < value.length; index += size) {
+    chunks.push(value.slice(index, index + size));
+  }
+  return chunks;
 }
 
 export function shorten(value: string, maxLength = 76): string {
